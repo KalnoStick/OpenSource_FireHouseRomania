@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dynamic Fire Risk Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet & H3 -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/h3-js@3.7.2/dist/browser/h3-js.umd.js"></script>
+
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .hexagon {
+      stroke-width: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    const map = L.map('map', {
+      minZoom: 5,
+      maxZoom: 12,
+      zoomControl: true
+    }).setView([45.9432, 24.9668], 6);
+
+    // Base tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Load Romania shape dynamically
+    fetch("/romania-geojson")
+      .then(res => res.json())
+      .then(data => {
+        const border = L.geoJSON(data, {
+          style: {
+            color: "black",
+            weight: 2,
+            fillOpacity: 0
+          }
+        }).addTo(map);
+        map.fitBounds(border.getBounds());
+      });
+
+    // Placeholder for H3 or dynamic hex markers
+    let hexLayer = L.layerGroup().addTo(map);
+  </script>
+</body>
+</html>

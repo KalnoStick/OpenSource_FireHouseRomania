@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Diagnostics</title>
+    <style>
+        h1, h2 {
+            text-align: center;
+        }
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        </style>
+</head>
+<body>
+    <h1>Diagnostics</h1>
+    <div>{{ chart|safe }}</div>
+    <br>
+    <br>
+    <div id="fireRiskChart" style="height: 500px;"></div>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+let layout = {
+    title: "Live Fire Risk Over Time",
+    template: "plotly_dark",
+    xaxis: { title: "Time", showgrid: false },
+    yaxis: { title: "Risk Level", range: [0, 1.2], showgrid: false },
+    margin: { t: 40, l: 50, r: 30, b: 50 },
+    paper_bgcolor: "black",
+    plot_bgcolor: "black"
+};
+
+let chartData = [{
+    x: [],
+    y: [],
+    mode: 'lines',
+    line: { color: 'turquoise', width: 3, shape: 'spline' }
+}];
+
+Plotly.newPlot('fireRiskChart', chartData, layout);
+
+// Accumulate data over time
+let fullTimes = [];
+let fullRisks = [];
+const maxPoints = 100; // Keep only last 100 points
+
+async function updateChart() {
+    try {
+        const response = await fetch('/api/fire-risk-data');
+        const data = await response.json();
+
+        if (data.length > 0) {
+            const lastPoint = data[data.length - 1]; // Just the newest point
+            const time = new Date(lastPoint.timestamp);
+            const risk = lastPoint.risk_level;
+
+            fullTimes.push(time);
+            fullRisks.push(risk);
+
+            // Keep only the last 100 points
+            if (fullTimes.length > maxPoints) {
+                fullTimes.shift();
+                fullRisks.shift();
+            }
+
+            Plotly.update('fireRiskChart', {
+                x: [fullTimes],
+                y: [fullRisks]
+            }, {}, [0]);
+        }
+    } catch (err) {
+        console.error("Chart update error:", err);
+    }
+}
+
+updateChart(); // initial load
+setInterval(updateChart, 1000); // update every second
+</script>
+
+
+</body>
+</html>
