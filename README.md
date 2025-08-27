@@ -1,9 +1,18 @@
-Librarii externe folosite: PyQt5, Flask, plotly, numpy, pandas, geopandas, folium, waitress, pygraph, open3d, werkzeug-middleware, trimesh , psutil, sqlite3.
+This is FireHouseRomania-all in one powerfull software where you can monitorize fire hazards and prevent yourself from being in the middle of a calamity.
+This uses powerfull python libraries like PyQt5, Flask, plotly, numpy, pandas, geopandas, folium, waitress, pygraph, open3d, werkzeug-middleware, trimesh , psutil, sqlite3, for GUI and server side.
+Also for ensuring best prevention against fire hazards, the app disposes of AI tools like AI generated content for maps using RandomForestClassifier and YOLO8s for advanced CV, allowing for live advice in Street View.
 
-Codul pentru GUI este realizat cu AI (ChatGPT), din punct de vedere al template-urilor pentru elementele individuale ale interfetei grafice, scalate manual pentru tot restul proiectului. 
+The server is hosted using Nginx.
 
-Pentru server s-a utilizat AI-ul pentru realizarea functiilor de creare a hartilor si a conectarii la baza de date din Flask.
-Cu ajutorul AI-ului au fost realizate si configuratiile nginx pentru host al serverului (ce transmite catre domeniul corespunzator).
+Files that are used for training (TIFF files) and some artwork like background images and shapefiles are from internet.
 
-Fisierele regasite in Assests_AI, Asset_image (imagini, fisierele de tip tif, documentele de tip dbf, shx, shp) sunt luate de pe internet.
-Mediul utilizat-PyCharm 2025.1.3.1
+Data provided by NASA EarthSearch and NASA FIRMS for training.
+
+New model trained every week.
+
+Some of the code was made using AI(ChatGPT), like the Nginx config, some code for the GUI, scaled manually and some server logic and ai implementation.
+Advice took from tutrials regarding importing certain libraries.
+
+Used env: PyCharm 2025.1.3.1
+
+
