@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fire Risk from FIRN | Latest Model</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+      html, body { height:100%; margin:0; }
+    #wrap { display:flex; height:100%; width:100%; }
+    #map { flex: 1 1 100%; }
+    #toolbar
+    {position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.9);
+      padding: 6px 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: flex;
+      gap: 8px;}
+    #toolbar button { padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#fafafa; cursor:pointer; }
+    #toolbar button:hover { background:#f0f0f0; }
+    #hint { padding:12px; text-align:center; }
+    #coords { margin-left:auto; font:12px/1.2 system-ui, sans-serif; color:#667; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+<div id="map"></div>
+  <div id="toolbar">
+    <button id="btnOpen">Open Street View</button>
+      <div id="coords">lat: --, lon: --</div>
+  </div>
+</div>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script> src="qrc:///qtwebchannel/qwebchannel.js"
+/*(function(){
+  function load(src){ const s=document.createElement('script'); s.src=src; document.head.appendChild(s); }
+  if (typeof qt !== 'undefined') {
+    load('qrc:///qtwebchannel/qwebchannel.js');
+  } else {
+    // serve a copy via Flask /static (put qwebchannel.js there)
+    load('/static/qwebchannel.js');
+  }
+})();*/</script>
+<script>
+  const map = L.map('map',{ preferCanvas: true }).setView([45.94, 24.97], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  //const inQt = navigator.userAgent?.includes('QtWebEngine');
+  const canvasRenderer = L.canvas({ padding: 0.5 });
+
+  let fireLayer = L.layerGroup().addTo(map);
+  //let predLayer = L.layerGroup().addTo(map);
+  // let predLayer = buildPredsLayer(predsFC).addTo(map);
+  let predsPointsLayer = null;
+  let predsPolysLayer  = null;
+  //L.control.layers(null, { 'FIRMS': fireLayer, 'Predictions': predLayer }).addTo(map);
+  L.control.layers(null, { 'FIRMS': fireLayer }).addTo(map);
+
+  /*async function refreshLayers() {
+    const [firesFC, predsFC] = await Promise.all([
+      fetch('/api/fires', { cache:'no-store' }).then(r=>r.json()),
+      fetch('/api/predictions',{ cache:'no-store' }).then(r=>r.json())
+    ]);*/
+
+    function colorForRisk(r) {
+  return (r >= 4) ? 'red' : (r === 3) ? 'orange' : (r === 2) ? 'yellow' : 'green';
+}
+
+    async function refreshLayers() {
+  const [firesFC, predsPointsFC] = await Promise.all([
+    fetch('/api/fires', { cache:'no-store' }).then(r=>r.json()),
+    fetch('/api/predictions?ratio=0.4', { cache:'no-store' }).then(r=>r.json()),
+  ]);
+  let predsPolyFC = null;
+try {
+  predsPolyFC = await fetchJSON('/api/prediction_polygons?simplify_m=300');
+} catch (e) {
+  console.warn('Polygon endpoint failed; continuing with points only.');
+}
+if (predsPolyFC) {
+  L.geoJSON(predsPolyFC, { }).addTo(map);
+}
+
+    //fireLayer.clearLayers();
+    //predLayer.clearLayers();
+
+      fireLayer.clearLayers();
+  if (predsPointsLayer) { map.removeLayer(predsPointsLayer); predsPointsLayer = null; }
+  if (predsPolysLayer)  { map.removeLayer(predsPolysLayer);  predsPolysLayer  = null; }
+
+
+    /*L.geoJSON(firesFC, {
+      pointToLayer: (f, latlng) => {
+        const c = (f.properties.confidence && parseFloat(f.properties.confidence) >= 80) ? '#d90429' : '#f9c74f';
+        return L.circleMarker(latlng, {radius:5, color:c, fillOpacity:0.8})
+                 .bindPopup(`FIRMS ${f.properties.acq_date ?? ''} ${f.properties.acq_time ?? ''}`);
+      }
+    }).addTo(fireLayer);
+
+    L.geoJSON(predsFC, {
+      pointToLayer: (f, latlng) => {
+        const r = Number(f.properties.Predicted_Fire_Risk);
+        const color = (r>=4)?'red':(r==3)?'orange':(r==2)?'yellow':'green';
+        return L.circleMarker(latlng, {radius:3, color,fillColor: color, fillOpacity:0.35})
+                 .bindPopup(`Predicted risk: ${r}`);
+      }
+    }).addTo(predLayer);
+  }*/
+
+  L.geoJSON(firesFC, {
+    renderer: canvasRenderer,
+    pointToLayer: (f, latlng) => {
+      const conf = Number(f.properties?.confidence ?? 0);
+      const c = conf >= 80 ? '#d90429' : '#f9c74f';
+      return L.circleMarker(latlng, { radius:5, color:c, fillColor:c, fillOpacity:0.8 })
+               .bindPopup(`FIRMS ${f.properties.acq_date ?? ''} ${f.properties.acq_time ?? ''}`);
+    }
+  }).addTo(fireLayer);
+
+  // Predictions – points (downsampled ~40%)
+  predsPointsLayer = L.geoJSON(predsPointsFC, {
+    renderer: canvasRenderer,
+    pointToLayer: (f, latlng) => {
+      const r = Number(f.properties?.Predicted_Fire_Risk ?? 0);
+      const color = colorForRisk(r);
+      return L.circleMarker(latlng, { radius:3, weight:1, color, fillColor: color, fillOpacity:0.45 })
+               .bindPopup(`Predicted risk: ${r}`);
+    }
+  });
+
+    predsPolysLayer = L.geoJSON(predsPolyFC, {
+    style: f => {
+      const r = Number(f.properties?.Predicted_Fire_Risk ?? 0);
+      const color = colorForRisk(r);
+      return { color, weight: 1, fillColor: color, fillOpacity: 0.18 };
+    }
+  });
+
+  updatePredsVisibility(true);
+}
+
+function updatePredsVisibility(fitOnce=false) {
+  const z = map.getZoom();
+  if (z < 9) { // low zoom: show polygons
+    if (predsPointsLayer && map.hasLayer(predsPointsLayer)) map.removeLayer(predsPointsLayer);
+    if (predsPolysLayer && !map.hasLayer(predsPolysLayer)) predsPolysLayer.addTo(map);
+    if (fitOnce && predsPolysLayer) {
+      const b = predsPolysLayer.getBounds(); if (b.isValid()) map.fitBounds(b.pad(0.05));
+    }
+  } else {     // high zoom: show points
+    if (predsPolysLayer && map.hasLayer(predsPolysLayer)) map.removeLayer(predsPolysLayer);
+    if (predsPointsLayer && !map.hasLayer(predsPointsLayer)) predsPointsLayer.addTo(map);
+  }
+}
+
+map.on('zoomend', () => updatePredsVisibility(false));
+
+    //Double view logic
+  let marker = null;
+  let lastLat = null, lastLon = null;
+
+  const coordsEl = document.getElementById('coords');
+  //const coordsEl = document.getElementById('coords');
+
+  function setCoords(lat, lon) {
+    coordsEl.textContent = `lat: ${lat.toFixed(6)}, lon: ${lon.toFixed(6)}`;
+  }
+
+     map.on('click', e => {
+    const { lat, lng } = e.latlng;
+    lastLat = lat; lastLon = lng;
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lng]).addTo(map);
+    setCoords(lat, lng);
+    });
+
+   (function initQtBridge(){
+    if (typeof QWebChannel === 'undefined') return;
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+      window.pybridge = channel.objects.pybridge;
+    });
+  })();
+
+   function streetViewURL(lat, lon) {
+    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lon.toFixed(6)}`;
+  }
+
+    function openStreetViewExternal(lat, lon) {
+    const url = streetViewURL(lat, lon);
+    if (window.pybridge && typeof window.pybridge.openExternal === 'function') {
+      window.pybridge.openExternal(url);
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+  }
+  document.getElementById('btnOpen').addEventListener('click', () => {
+  if (lastLat == null) { alert('Click the map first'); return; }
+  openStreetViewExternal(lastLat, lastLon);
+});
+
+  // first load + refresh 10 min
+  refreshLayers();
+  setInterval(refreshLayers, 10*60*1000);
+</script>
+</body>
+</html>
